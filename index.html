@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Valleumbrío 3D - Pantalla Ultra Gigante</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0; padding: 0;
+            background-color: #0b0f19; color: #f1f5f9;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+            min-height: 100vh; overflow-x: hidden; touch-action: manipulation;
+            padding: 10px;
+        }
+        #game-layout { 
+            display: flex; flex-direction: column; gap: 15px; 
+            max-width: 1600px; width: 100%; align-items: center; 
+        }
+        @media(min-width: 1100px) {
+            #game-layout { flex-direction: row; align-items: stretch; }
+        }
+        #canvas-container { 
+            position: relative; border: 4px solid #d97706; background: #070a13; 
+            box-shadow: 0 25px 60px -12px rgba(0,0,0,0.9); border-radius: 14px; 
+            width: 100%; flex: 2.5; display: flex; flex-direction: column;
+            overflow: hidden;
+        }
+        canvas { 
+            display: block; border-radius: 10px 10px 0 0; 
+            width: 100%; height: auto; image-rendering: pixelated; 
+        }
+        #side-panel {
+            width: 100%; background: #0f172a; border: 2px solid #334155; padding: 16px;
+            display: flex; flex-direction: column; gap: 12px;
+            border-radius: 12px; min-height: 250px; flex: 1;
+        }
+        .log-section { height: 120px; overflow-y: auto; border-bottom: 1px solid #334155; padding-bottom: 8px; font-size: 0.9em; line-height: 1.5; color: #cbd5e1; }
+        @media(min-width: 1100px) { .log-section { height: 180px; } }
+        .notebook-section { font-size: 0.85em; color: #94a3b8; overflow-y: auto; flex-grow: 1; }
+        #dialogue-overlay {
+            position: absolute; bottom: 0; left: 0; right: 0;
+            background: rgba(15, 23, 42, 0.96); border-top: 3px solid #d97706;
+            padding: 12px 16px; min-height: 100px;
+            z-index: 10;
+        }
+        .btn-action {
+            background: #d97706; color: white; border: none; padding: 10px 16px;
+            cursor: pointer; font-weight: 600; margin-top: 6px; margin-right: 6px; border-radius: 6px;
+            text-transform: uppercase; font-size: 0.75em; letter-spacing: 1px; transition: all 0.2s ease;
+        }
+        .btn-action:hover { background: #b45309; transform: translateY(-1px); }
+        .btn-dialogue { background: #1e293b; color: #f1f5f9; border: 1px solid #475569; }
+        .btn-dialogue:hover { background: #334155; border-color: #fbbf24; }
+        .btn-close-chat { background: #dc2626; }
+        .btn-close-chat:hover { background: #b91c1c; }
+        .puzzle-input {
+            background: #1e293b; border: 1px solid #475569; color: #f1f5f9;
+            padding: 8px; border-radius: 4px; margin-top: 8px; width: 100%; max-width: 180px; font-family: monospace; font-size: 16px;
+        }
+        h3 { margin-top: 0; color: #f59e0b; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; font-size: 1.1em;}
+        .text-small { font-size: 0.82em; color: #94a3b8; letter-spacing: 0.5px; }
+
+        /* Contenedor controles móviles e instrucciones */
+        #mobile-controls { 
+            display: flex; flex-direction: row; width: 100%; max-width: 1600px; 
+            justify-content: space-between; align-items: center; margin-top: 12px; gap: 15px; user-select: none; 
+        }
+        #joystick-container {
+            width: 120px; height: 120px; background: rgba(30, 41, 59, 0.5);
+            border: 2px solid #475569; border-radius: 50%; position: relative;
+            touch-action: none; flex-shrink: 0; display: none; /* Se activa por JS en móviles */
+        }
+        #joystick-knob {
+            width: 50px; height: 50px; background: #d97706;
+            border-radius: 50%; position: absolute; top: 35px; left: 35px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5); transition: background 0.1s;
+        }
+        #joystick-container:active #joystick-knob { background: #fbbf24; }
+        
+        .instrucciones-text {
+            flex-grow: 1; color:#94a3b8; font-size:0.85em; text-align:right; line-height: 1.4;
+        }
+        @media (max-width: 768px) {
+            #joystick-container { display: block; }
+            .instrucciones-text { text-align: left; font-size: 0.8em; }
+        }
+    </style>
+</head>
+<body>
+
+    <h2 id="game-title" style="margin: 0 0 10px 0; letter-spacing: 2px; text-transform: uppercase; font-size: 1.3em; text-align: center; color: #f59e0b; font-weight: 700;">Valleumbrío 3D - Pantalla Cine-HD</h2>
+
+    <div id="game-layout">
+        <div id="canvas-container">
+            <canvas id="viewCanvas" width="1280" height="720"></canvas>
+            <div id="dialogue-overlay">
+                <div id="dialogue-text">Inicializando motores...</div>
+                <div id="action-area"></div>
+            </div>
+        </div>
+
+        <div id="side-panel">
+            <div class="log-section" id="story-log">
+                <strong>[Diario de Notas]</strong><br>Explora los alrededores. Presta atención a las cabañas con tejados rústicos de arcilla y los caminos adoquinados.
+            </div>
+            <div class="notebook-section" id="notebook">
+                <div id="inventario-status" style="margin-bottom: 8px;">Mochila: Vacía</div>
+                <strong>📋 Lista de Objetivos:</strong>
+                <ul style="margin: 5px 0; padding-left: 0; list-style-type: none;" id="pistas-lista">
+                    <li id="p0">❌ 1. Preguntar a un vecino cuánta gente vive aquí.</li>
+                    <li id="p1">❌ 2. Encontrar objeto: Buscar la llave en la Fuente de Piedra.</li>
+                    <li id="p2">❌ 3. Acertijo del Poste: Descifrar la base del poste de luz.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div id="mobile-controls">
+        <div id="joystick-container">
+            <div id="joystick-knob"></div>
+        </div>
+        <div class="instrucciones-text" id="instrucciones">
+            Elige preguntas con el ratón o tocando la pantalla.<br>Usa W,A,S,D o las Flechas para moverte en PC. Usa el Joystick virtual en móviles.
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // SISTEMA DE AUDIO TÉTRICO Y NOSTÁLGICO
+        // ==========================================
+        let audioCtx = null;
+        let musicInterval = null;
+        let droneOsc = null;
+        let droneGain = null;
+
+        const notasCajaMusica = [
+            523.25, 0, 587.33, 622.25, 0, 783.99, 
+            740.00, 0, 622.25, 587.33, 0, 523.25, 
+            493.88, 0, 523.25, 587.33, 0, 783.99, 
+            698.46, 0, 622.25, 587.33, 493.88, 0  
+        ];
+        let notaActualIndex = 0;
+
+        function iniciarMusicaAmbiente() {
+            if (audioCtx) {
+                if (audioCtx.state === 'suspended') { audioCtx.resume(); }
+                if (!musicInterval) { lanzarBucleMelodia(); }
+                return; 
+            }
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            droneOsc = audioCtx.createOscillator();
+            droneGain = audioCtx.createGain();
+            droneOsc.type = 'sine';
+            droneOsc.frequency.setValueAtTime(48.99, audioCtx.currentTime); 
+            droneGain.gain.setValueAtTime(0.04, audioCtx.currentTime); 
+            droneOsc.connect(droneGain);
+            droneGain.connect(audioCtx.destination);
+            droneOsc.start();
+            lanzarBucleMelodia();
+        }
+
+        function lanzarBucleMelodia() {
+            musicInterval = setInterval(() => {
+                if (gameStage.startsWith("FINAL_")) {
+                    clearInterval(musicInterval);
+                    musicInterval = null;
+                    return;
+                }
+                let freq = notasCajaMusica[notaActualIndex];
+                notaActualIndex = (notaActualIndex + 1) % notasCajaMusica.length;
+                if (freq > 0) { tocarNotaCaja(freq); }
+            }, 550);
+        }
+
+        function tocarNotaCaja(frecuencia) {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            osc.type = 'sine';
+            let desafinacionAleatoria = (Math.random() * 12) - 6; 
+            osc.frequency.setValueAtTime(frecuencia, audioCtx.currentTime);
+            osc.detune.setValueAtTime(desafinacionAleatoria, audioCtx.currentTime);
+            osc.detune.linearRampToValueAtTime(desafinacionAleatoria + 15, audioCtx.currentTime + 0.3);
+            osc.detune.linearRampToValueAtTime(desafinacionAleatoria - 15, audioCtx.currentTime + 0.8);
+            gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+            gainNode.gain.linearRampToValueAtTime(0.14, audioCtx.currentTime + 0.01); 
+            gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 1.4); 
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 1.5);
+        }
+
+        // ==========================================
+        // VARIABLES Y CONFIGURACIÓN DEL JUEGO
+        // ==========================================
+        const canvas = document.getElementById('viewCanvas');
+        const ctx = canvas.getContext('2d');
+        const dialogueText = document.getElementById('dialogue-text');
+        const actionArea = document.getElementById('action-area');
+        const storyLog = document.getElementById('story-log');
+        const invStatus = document.getElementById('inventario-status');
+
+        let gameStage = "INTRO"; 
+        let timeOfDay = 1.8; 
+        const timeSpeed = 0.0005; 
+        
+        let inventario = [];
+        let currentPuzzleIndex = 0;
+        let vecinoActualId = null;
+        
+        let interfazActual = null;
+        let dialogueCooldownUntil = 0;
+        let finalSceneTimer = 0; 
+
+        const MAP_SIZE = 48;
+        const map = Array(MAP_SIZE).fill(null).map(() => Array(MAP_SIZE).fill(0));
+
+        for(let i=0; i<MAP_SIZE; i++) {
+            map[0][i] = 1; map[MAP_SIZE-1][i] = 1;
+            map[i][0] = 1; map[i][MAP_SIZE-1] = 1;
+        }
+
+        const treePositions = [
+            [5,8], [6,24], [12,35], [18,14], [22,40], [30,10], [38,28], [42,15], [15,15], [28,32],
+            [10,20], [14,8], [25,35], [32,18], [40,40], [44,30], [20,44], [8,30]
+        ];
+        treePositions.forEach(([y, x]) => { map[y][x] = 2; });
+
+        const decorHouses = [
+            [8,5], [4,38], [15,42], [20,5], [25,22], [32,44], [40,5], [42,35], [35,18],
+            [12,12], [18,28], [28,6], [4,18], [30,38], [36,30], [44,10], [16,22], [24,45],
+            [34,6], [6,15], [14,32], [22,32], [45,15], [38,12]
+        ];
+        decorHouses.forEach(([y, x]) => { map[y][x] = 3; });
+
+        const rockPositions = [[18,20], [15,26], [34,17], [10,10], [25,8], [38,38]];
+        rockPositions.forEach(([y, x]) => { map[y][x] = 4; });
+
+        map[22][12] = 'F'; 
+        map[24][24] = 'M'; 
+
+        const player = { x: 12.5, y: 24.8, angle: -Math.PI / 2, fov: Math.PI / 3 };
+
+        const nombresVecinos = [
+            "Pedro", "Ana", "Juan", "Luis", "Sofía", "Carlos", "Elena", "Mateo", "Lucía", "Diego",
+            "Clara", "Hugo", "Inés", "Bruno", "Marta", "Lucas", "Valeria", "Tomás", "González", "López",
+            "Carmen", "Andrés", "Silvia", "Santi"
+        ];
+
+        const vecinos = [];
+        decorHouses.forEach((casa, index) => {
+            let cX = casa[1] + 0.5; let cY = casa[0] + 0.5;
+            vecinos.push({
+                id: "vecino" + (index + 1),
+                nombre: nombresVecinos[index],
+                casaX: cX, casaY: cY,
+                x: cX, y: cY,
+                destinoX: cX, destinoY: cY,
+                estado: "dentro",
+                velocidad: 0.012 + Math.random() * 0.012,
+                color: `hsl(${(index * 24) % 360}, 75%, 55%)`
+            });
+        });
+
+        function hashNoise(x, y) {
+            let h = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453123;
+            return h - Math.floor(h);
+        }
+
+        // CONTROL POR TECLADO
+        const keys = {};
+        window.addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; });
+        window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+
+        // ==========================================
+        // LÓGICA DEL JOYSTICK VIRTUAL TÁCTIL
+        // ==========================================
+        const joystickContainer = document.getElementById('joystick-container');
+        const joystickKnob = document.getElementById('joystick-knob');
+        let joystickInput = { x: 0, y: 0 }; 
+        let joystickActive = false;
+
+        if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+            joystickContainer.style.display = 'block';
+        }
+
+        function handleJoystickMove(clientX, clientY) {
+            const rect = joystickContainer.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            
+            let deltaX = clientX - centerX;
+            let deltaY = clientY - centerY;
+            let distance = Math.hypot(deltaX, deltaY);
+            const maxRadius = rect.width / 2 - 10; 
+
+            if (distance > maxRadius) {
+                deltaX = (deltaX / distance) * maxRadius;
+                deltaY = (deltaY / distance) * maxRadius;
+                distance = maxRadius;
+            }
+
+            joystickKnob.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+            
+            // Normalizar valores entre -1 y 1
+            joystickInput.x = deltaX / maxRadius;
+            joystickInput.y = deltaY / maxRadius;
+        }
+
+        joystickContainer.addEventListener('touchstart', (e) => {
+            joystickActive = true;
+            const touch = e.touches[0];
+            handleJoystickMove(touch.clientX, touch.clientY);
+        }, { passive: true });
+
+        window.addEventListener('touchmove', (e) => {
+            if (!joystickActive) return;
+            const touch = e.touches[0];
+            handleJoystickMove(touch.clientX, touch.clientY);
+        }, { passive: true });
+
+        window.addEventListener('touchend', () => {
+            if (!joystickActive) return;
+            joystickActive = false;
+            joystickKnob.style.transform = 'translate(0px, 0px)';
+            joystickInput.x = 0;
+            joystickInput.y = 0;
+        });
+
+        // ==========================================
+        // MOVIMIENTO Y PROCESAMIENTO
+        // ==========================================
+        function processMovement() {
+            if (gameStage !== "EXPLORACION") return;
+            
+            let moveSpeed = 0.08; 
+            let rotSpeed = 0.045;
+            let nextX = player.x; let nextY = player.y;
+
+            // Integración de inputs Teclado + Joystick
+            let forward = 0;
+            let rotation = 0;
+
+            if (keys['w'] || keys['arrowup']) forward = 1;
+            if (keys['s'] || keys['arrowdown']) forward = -1;
+            if (keys['a'] || keys['arrowleft']) rotation = -1;
+            if (keys['d'] || keys['arrowright']) rotation = 1;
+
+            if (joystickActive) {
+                // Eje Y del joystick controla avance/retroceso
+                if (joystickInput.y < -0.2) forward = Math.abs(joystickInput.y);
+                if (joystickInput.y > 0.2) forward = -Math.abs(joystickInput.y);
+                // Eje X del joystick controla rotación de cámara
+                if (joystickInput.x < -0.2) rotation = joystickInput.x;
+                if (joystickInput.x > 0.2) rotation = joystickInput.x;
+            }
+
+            player.angle += rotation * rotSpeed;
+            nextX += Math.cos(player.angle) * (forward * moveSpeed);
+            nextY += Math.sin(player.angle) * (forward * moveSpeed);
+
+            let checkY = Math.floor(nextY); let checkX = Math.floor(nextX);
+            if (map[checkY] && map[checkY][checkX] === 0) { 
+                player.x = nextX; 
+                player.y = nextY; 
+            }
+            checkProximity();
+        }
+
+        function updateVecinosIA() {
+            if (gameStage.startsWith("FINAL_")) return;
+            let totalHoras = (timeOfDay / (Math.PI * 2)) * 24;
+            let horaActual = Math.floor(totalHoras) % 24;
+
+            vecinos.forEach(v => {
+                if (gameStage === "CONVERSACION" && v.id === vecinoActualId) {
+                    v.estado = "hablando"; return; 
+                }
+                if (horaActual >= 6 && horaActual < 19) {
+                    if (v.estado === "dentro" || v.estado === "hablando") v.estado = "paseando";
+                } else { v.estado = "dentro"; }
+
+                if (v.estado === "paseando") {
+                    let dx = v.destinoX - v.x; let dy = v.destinoY - v.y;
+                    let dist = Math.hypot(dx, dy);
+                    if (dist > 0.15) {
+                        v.x += (dx / dist) * v.velocidad; v.y += (dy / dist) * v.velocidad;
+                    } else {
+                        v.destinoX = v.casaX + (Math.random() * 6 - 3); v.destinoY = v.casaY + (Math.random() * 6 - 3);
+                    }
+                } else if (v.estado === "dentro") { v.x = v.casaX; v.y = v.casaY; }
+            });
+        }
+
+        function checkProximity() {
+            if (gameStage !== "EXPLORACION") return;
+            if (Date.now() < dialogueCooldownUntil) return;
+
+            let pX = Math.floor(player.x); let pY = Math.floor(player.y);
+            let cercano = null;
+            vecinos.forEach(v => {
+                if (v.estado !== "dentro") {
+                    let d = Math.hypot(player.x - v.x, player.y - v.y);
+                    if (d < 1.4) cercano = v;
+                }
+            });
+
+            if (cercano) {
+                vecinoActualId = cercano.id;
+                gameStage = "CONVERSACION"; 
+                interfazActual = null;
+                // Reset manual del joystick al entrar en diálogos para evitar que el jugador siga caminando solo
+                joystickInput = {x:0, y:0};
+                
+                dialogueText.innerHTML = `<h3>🗣️ Hablando con ${cercano.nombre}</h3>El aldeano se ha detenido. Selecciona una pregunta:`;
+                actionArea.innerHTML = `
+                    <button class="btn-action btn-dialogue" onclick="preguntarVecino('tomas')">¿Tomás?</button>
+                    <button class="btn-action btn-dialogue" onclick="preguntarVecino('pueblo')">¿Qué pasa aquí?</button>
+                    <button class="btn-action btn-dialogue" onclick="preguntarVecino('puzle')">Acertijo</button>
+                    <button class="btn-action btn-close-chat" onclick="cerrarConversacion()">❌ Salir</button>
+                `;
+                return; 
+            }
+
+            let cercaDeFuente = false;
+            let cercaDePoste = false;
+
+            for(let dy = -1; dy <= 1; dy++) {
+                for(let dx = -1; dx <= 1; dx++) {
+                    let checkY = pY + dy; let checkX = pX + dx;
+                    if(map[checkY]) {
+                        if(map[checkY][checkX] === 'F') cercaDeFuente = true;
+                        if(map[checkY][checkX] === 'M') cercaDePoste = true;
+                    }
+                }
+            }
+
+            if (cercaDeFuente) {
+                if (interfazActual !== "fuente") {
+                    interfazActual = "fuente";
+                    dialogueText.innerHTML = "<h3>⛲ Fuente de Piedra</h3>Agua cristalina junto a una foguera central. Hay una llave en la base.";
+                    if (currentPuzzleIndex === 1) {
+                        actionArea.innerHTML = `<button class="btn-action" onclick="recogerItem('Llave Antigua')">Tomar Llave</button>`;
+                    } else { actionArea.innerHTML = ""; }
+                }
+                return;
+            }
+            
+            if (cercaDePoste) {
+                if (interfazActual !== "poste") {
+                    interfazActual = "poste";
+                    dialogueText.innerHTML = "<h3>💡 Poste de Luz Cifrado</h3>El candil ilumina un poste rústico de madera vieja.";
+                    if (currentPuzzleIndex === 2) {
+                        actionArea.innerHTML = `<button class="btn-action" onclick="abrirPuzleMural()">Leer Inscripción</button>`;
+                    } else { actionArea.innerHTML = ""; }
+                }
+                return;
+            }
+
+            vecinoActualId = null;
+            if (interfazActual !== "explorando") {
+                interfazActual = "explorando";
+                dialogueText.innerHTML = "<div class='text-small'>🌲 <em>Explora Valleumbrío. Las cabañas tienen tejados naranjas...</em></div>";
+                actionArea.innerHTML = "";
+            }
+        }
+
+        function preguntarVecino(tipo) {
+            let v = vecinos.find(x => x.id === vecinoActualId);
+            if (!v) return;
+            let respuesta = "";
+
+            if (tipo === 'tomas') { respuesta = "Él descubrió lo que hacemos por las noches. Ya no está."; } 
+            else if (tipo === 'pueblo') { respuesta = "Nadie que cruza la niebla de Valleumbrío vuelve a su casa real."; } 
+            else if (tipo === 'puzle') {
+                if (currentPuzzleIndex === 0) {
+                    dialogueText.innerHTML = `<h3>🧩 Acertijo de ${v.nombre}</h3>"Somos 24 aldeanos y el Gobernador. ¿Cuántos somos en total?"<br><input type='number' id='pAns' class='puzzle-input' placeholder='Respuesta...'>`;
+                    actionArea.innerHTML = `
+                        <button class="btn-action" onclick="validarPuzle('25')">Enviar</button> 
+                        <button class="btn-action btn-dialogue" onclick="volverMenuPreguntas()">Volver</button>
+                    `;
+                    return;
+                } else { respuesta = "Ya respondiste mis preguntas. Completa los otros objetivos."; }
+            }
+
+            storyLog.innerHTML += `<br>🗣️ <strong>${v.nombre}:</strong> "${respuesta}"`;
+            storyLog.scrollTop = storyLog.scrollHeight;
+            dialogueText.innerHTML = `<h3>🗣️ Hablando con ${v.nombre}</h3>"${respuesta}"`;
+        }
+
+        function volverMenuPreguntas() {
+            let v = vecinos.find(x => x.id === vecinoActualId);
+            dialogueText.innerHTML = `<h3>🗣️ Hablando con ${v.nombre}</h3>¿Qué más quieres consultarme?`;
+            actionArea.innerHTML = `
+                <button class="btn-action btn-dialogue" onclick="preguntarVecino('tomas')">¿Tomás?</button>
+                <button class="btn-action btn-dialogue" onclick="preguntarVecino('pueblo')">¿Qué pasa?</button>
+                <button class="btn-action btn-dialogue" onclick="preguntarVecino('puzle')">Acertijo</button>
+                <button class="btn-action btn-close-chat" onclick="cerrarConversacion()">❌ Salir</button>
+            `;
+        }
+
+        function cerrarConversacion() {
+            gameStage = "EXPLORACION"; 
+            dialogueCooldownUntil = Date.now() + 1500; 
+            vecinoActualId = null; interfazActual = null;
+            dialogueText.innerHTML = "<div class='text-small'>🌲 <em>¡Aléjate rápido del aldeano!</em></div>";
+            actionArea.innerHTML = "";
+        }
+
+        function abrirPuzleMural() {
+            gameStage = "CONVERSACION"; interfazActual = null;
+            dialogueText.innerHTML = `<h3>🧩 El Cifrado del Poste</h3>El grabado dice: Escribe 'valleumbrio' en minúsculas.<br><input type='text' id='pAns' class='puzzle-input' placeholder='Nombre...'>`;
+            actionArea.innerHTML = `
+                <button class="btn-action" onclick="validarPuzle('valleumbrio')">Confirmar</button> 
+                <button class="btn-action btn-close-chat" onclick="cerrarConversacion()">Dejar de mirar</button>
+            `;
+        }
+
+        function validarPuzle(correcta) {
+            let ans = document.getElementById('pAns').value.trim().toLowerCase();
+            if (ans === correcta.toLowerCase()) {
+                document.getElementById(`p${currentPuzzleIndex}`).innerHTML = `✔ ${currentPuzzleIndex + 1}. Resuelto con éxito.`;
+                document.getElementById(`p${currentPuzzleIndex}`).style.color = "#10b981";
+                storyLog.innerHTML += `<br>🔮 <strong>Progreso:</strong> ¡Objetivo completado!`;
+                storyLog.scrollTop = storyLog.scrollHeight;
+                currentPuzzleIndex++;
+                cerrarConversacion();
+                if (currentPuzzleIndex === 3) { iniciarSecuenciaFinal(); }
+            } else { alert("Respuesta incorrecta. Inténtalo de nuevo."); }
+        }
+
+        function recogerItem(nombreItem) {
+            inventario.push(nombreItem);
+            invStatus.innerHTML = `Mochila: ${inventario.join(', ')}`;
+            storyLog.innerHTML += `<br>🎒 <strong>Obtenido:</strong> ${nombreItem}`;
+            storyLog.scrollTop = storyLog.scrollHeight;
+            document.getElementById(`p${currentPuzzleIndex}`).innerHTML = `✔ ${currentPuzzleIndex + 1}. Conseguido: ${nombreItem}`;
+            document.getElementById(`p${currentPuzzleIndex}`).style.color = "#10b981";
+            currentPuzzleIndex++; interfazActual = null; 
+            checkProximity();
+            if (currentPuzzleIndex === 3) { iniciarSecuenciaFinal(); }
+        }
+
+        function iniciarSecuenciaFinal() {
+            gameStage = "FINAL_AGARRADO"; finalSceneTimer = Date.now();
+            if (musicInterval) clearInterval(musicInterval); musicInterval = null;
+            try {
+                if (audioCtx) {
+                    const finalOsc = audioCtx.createOscillator();
+                    const finalGain = audioCtx.createGain();
+                    finalOsc.type = 'sawtooth';
+                    finalOsc.frequency.setValueAtTime(85, audioCtx.currentTime); 
+                    finalGain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+                    finalOsc.connect(finalGain); finalGain.connect(audioCtx.destination);
+                    finalOsc.start(); finalOsc.stop(audioCtx.currentTime + 3.5);
+                }
+            } catch(e){}
+            document.getElementById('game-title').innerHTML = "🚨 DEMASIADO TARDE 🚨";
+            document.getElementById('game-title').style.color = "#ef4444";
+            dialogueText.innerHTML = `<h3>⚠️ ¡TE HAN AGARRADO!</h3>Un montón de manos frías te sujetan desde las sombras...`;
+            actionArea.innerHTML = "";
+        }
+
+        function reiniciarBucleInfinito() {
+            gameStage = "EXPLORACION"; currentPuzzleIndex = 0; inventario = []; interfazActual = null; vecinoActualId = null;
+            player.x = 12.5; player.y = 24.8; player.angle = -Math.PI / 2;
+            invStatus.innerHTML = "Mochila: Vacía";
+            document.getElementById('game-title').innerHTML = "Valleumbrío 3D - Pantalla Cine-HD";
+            document.getElementById('game-title').style.color = "#f59e0b";
+
+            const p0 = document.getElementById("p0");
+            const p1 = document.getElementById("p1");
+            const p2 = document.getElementById("p2");
+            p0.innerHTML = "❌ 1. Preguntar a un vecino cuánta gente vive aquí."; p0.style.color = "";
+            p1.innerHTML = "❌ 2. Encontrar objeto: Buscar la llave en la Fuente de Piedra."; p1.style.color = "";
+            p2.innerHTML = "❌ 3. Acertijo del Poste: Descifrar la base del poste de luz."; p2.style.color = "";
+
+            storyLog.innerHTML += `<br>👁️ <strong>[???]:</strong> Despiertas de golpe en la entrada del pueblo. El bucle reinicia.`;
+            storyLog.scrollTop = storyLog.scrollHeight;
+            dialogueText.innerHTML = `<h3>🌀 EL BUCLE RECOMIENZA</h3>Te despiertas sobresaltado en el mismo camino adoquinado...`;
+            actionArea.innerHTML = "";
+            iniciarMusicaAmbiente();
+        }
+
+        function setStage(stage) {
+            gameStage = stage;
+            if (stage === "INTRO") {
+                dialogueText.innerHTML = "<strong>Valleumbrío:</strong> Explora el asentamiento en primera persona. Completa tus objetivos utilizando los controles.";
+                actionArea.innerHTML = `<button class="btn-action" onclick="setStage('EXPLORACION')">Comenzar</button>`;
+            }
+            if (stage === "EXPLORACION") { iniciarMusicaAmbiente(); }
+        }
+
+        function render3D() {
+            if (gameStage === "FINAL_AGARRADO") {
+                dibujarEntorno3D(); 
+                ctx.fillStyle = `rgba(239, 68, 68, ${0.4 + Math.sin(Date.now() / 100) * 0.2})`;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                if (Date.now() - finalSceneTimer > 4000) {
+                    gameStage = "FINAL_PANTALLA_NEGRO"; finalSceneTimer = Date.now();
+                }
+                return;
+            }
+
+            if (gameStage === "FINAL_PANTALLA_NEGRO") {
+                ctx.fillStyle = "#000000"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                if (Date.now() - finalSceneTimer > 3500) {
+                    gameStage = "FINAL_CASA_FUEGO"; finalSceneTimer = Date.now();
+                    dialogueText.innerHTML = `<h3>🔥 TU CASA EN LLAMAS</h3>Tu verdadero hogar está ardiendo... Te has quedado atrapado.`;
+                    actionArea.innerHTML = ""; 
+                }
+                return;
+            }
+
+            if (gameStage === "FINAL_CASA_FUEGO") {
+                ctx.fillStyle = "#09060b"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                let pulseFire = Math.sin(Date.now() / 80) * 20;
+                let fireGrad = ctx.createRadialGradient(canvas.width/2, 380, 50, canvas.width/2, 380, 250);
+                fireGrad.addColorStop(0, `rgba(239, 68, 68, ${0.35 + pulseFire/200})`);
+                fireGrad.addColorStop(0.6, `rgba(217, 119, 6, 0.1)`);
+                fireGrad.addColorStop(1, 'rgba(0,0,0,0)');
+                ctx.fillStyle = fireGrad; ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                let cX = canvas.width / 2;
+                ctx.fillStyle = "#140e0e"; ctx.fillRect(cX - 120, 280, 240, 160); 
+                ctx.beginPath(); ctx.moveTo(cX - 140, 280); ctx.lineTo(cX, 180); ctx.lineTo(cX + 140, 280); ctx.closePath(); ctx.fill();
+                ctx.fillStyle = "#f59e0b"; ctx.fillRect(cX - 25, 360, 50, 80); ctx.fillRect(cX - 80, 310, 40, 40); ctx.fillRect(cX + 40, 310, 40, 40);
+
+                for(let f = 0; f < 45; f++) {
+                    let randX = cX - 130 + hashNoise(f, 1) * 260; let randY = 190 + hashNoise(f, 2) * 250;
+                    let fireHeight = 25 + Math.sin((Date.now() / 100) + f) * 15; let fireWidth = 10 + Math.cos((Date.now() / 150) + f) * 4;
+                    ctx.fillStyle = f % 3 === 0 ? "#ef4444" : (f % 3 === 1 ? "#f97316" : "#facc15");
+                    ctx.fillRect(randX - fireWidth/2, randY - fireHeight, fireWidth, fireHeight);
+                }
+
+                const totalVecinosFinal = 12;
+                for (let v = 0; v < totalVecinosFinal; v++) {
+                    let angleStep = Math.PI / (totalVecinosFinal - 1); let currentAngle = Math.PI + angleStep * v;
+                    let vecX = cX + Math.cos(currentAngle) * (350 + Math.sin(Date.now()/500 + v)*10); let vecY = 560 + Math.sin(currentAngle) * 80;
+                    ctx.fillStyle = "#050508"; ctx.beginPath(); ctx.ellipse(vecX, vecY, 25, 55, 0, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(vecX, vecY - 60, 16, 0, Math.PI * 2); ctx.fill();
+                    if (Math.floor(Date.now() / 400) % 10 !== v % 10) {
+                        ctx.fillStyle = "#ff2222"; ctx.fillRect(vecX - 6, vecY - 62, 3, 3); ctx.fillRect(vecX + 3, vecY - 62, 3, 3);
+                    }
+                }
+                if (Date.now() - finalSceneTimer > 6000) { reiniciarBucleInfinito(); }
+                return;
+            }
+
+            if (gameStage === "INTRO") return;
+            dibujarEntorno3D();
+        }
+
+        function dibujarEntorno3D() {
+            let lightFactor = (Math.sin(timeOfDay) + 1.2) / 2.2;
+            let skyGrad = ctx.createLinearGradient(0, 0, 0, canvas.height / 2);
+            let rTop = Math.floor(45 * lightFactor), gTop = Math.floor(90 * lightFactor), bTop = Math.floor(115 * lightFactor);
+            let rBot = Math.floor(78 * lightFactor), gBot = Math.floor(125 * lightFactor), bBot = Math.floor(130 * lightFactor);
+            skyGrad.addColorStop(0, `rgb(${rTop}, ${gTop}, ${bTop})`); skyGrad.addColorStop(1, `rgb(${rBot}, ${gBot}, ${bBot})`);
+            ctx.fillStyle = skyGrad; ctx.fillRect(0, 0, canvas.width, canvas.height / 2);
+
+            let horizonY = canvas.height / 2;
+            for (let y = horizonY; y < canvas.height; y += 4) {
+                let ratio = (y - horizonY) / (canvas.height / 2);
+                let d = 1.0 / (ratio + 0.001); let fog = Math.exp(-d * 0.11);
+
+                for (let x = 0; x < canvas.width; x += 8) {
+                    let rayAngle = player.angle - player.fov / 2 + (x / canvas.width) * player.fov;
+                    let wx = player.x + Math.cos(rayAngle) * d; let wy = player.y + Math.sin(rayAngle) * d;
+                    let noise = hashNoise(Math.floor(wx*16), Math.floor(wy*16)) * 18;
+                    let esCamino = (Math.floor(wx) % 6 === 2 || Math.floor(wy) % 6 === 4 || (Math.floor(wx+wy) % 10 === 0));
+                    let rG, gG, bG;
+                    if (esCamino) { rG = 210 - noise; gG = 175 - noise; bG = 135 - noise; } 
+                    else { rG = 50 + noise; gG = 140 - noise; bG = 78; }
+                    ctx.fillStyle = `rgb(${Math.floor(rG * lightFactor * fog)}, ${Math.floor(gG * lightFactor * fog)}, ${Math.floor(bG * lightFactor * fog)})`;
+                    ctx.fillRect(x, y, 8, 4);
+                }
+            }
+
+            const numRays = canvas.width;
+            const halfFov = player.fov / 2;
+            const depthBuffer = new Array(numRays);
+
+            for (let i = 0; i < numRays; i += 2) { 
+                let rayAngle = player.angle - halfFov + (i / numRays) * player.fov;
+                let distance = 0; let hitWall = false; let wallType = 0;
+                let cos = Math.cos(rayAngle); let sin = Math.sin(rayAngle);
+                let hitX = 0, hitY = 0;
+
+                while (!hitWall && distance < 24) {
+                    distance += 0.03; hitX = player.x + cos * distance; hitY = player.y + sin * distance;
+                    let checkX = Math.floor(hitX); let checkY = Math.floor(hitY);
+                    if (checkX < 0 || checkX >= MAP_SIZE || checkY < 0 || checkY >= MAP_SIZE) {
+                        hitWall = true; distance = 24;
+                    } else if (map[checkY][checkX] !== 0) { hitWall = true; wallType = map[checkY][checkX]; }
+                }
+
+                let correctedDist = distance * Math.cos(rayAngle - player.angle);
+                depthBuffer[i] = correctedDist; depthBuffer[i+1] = correctedDist;
+
+                let wallHeight = Math.min(canvas.height, (canvas.height / correctedDist));
+                let blockInnerX = hitX - Math.floor(hitX); let blockInnerY = hitY - Math.floor(hitY);
+                let isYWall = (Math.abs(blockInnerX) > 0.95 || Math.abs(blockInnerX) < 0.05);
+                let texCoordX = isYWall ? blockInnerY : blockInnerX;
+                let p64X = Math.floor(texCoordX * 64); 
+
+                let geoOffset = 0;
+                if (wallType === 3) { geoOffset = (0.5 - Math.abs((p64X / 64) - 0.5)) * 75; } 
+                else if (wallType === 2) { geoOffset = (Math.sqrt(Math.max(0, (0.5 - Math.abs((p64X / 64) - 0.5)) * 2)) - 0.6) * 130; }
+
+                let finalWallHeight = Math.max(6, wallHeight + geoOffset * (1.8 / correctedDist));
+                let topY = Math.floor((canvas.height - finalWallHeight) / 2);
+                let fogFactor = Math.max(0, Math.min(1, Math.exp(-distance * 0.09)));
+                let wallLight = Math.max(0.3, lightFactor) * (isYWall ? 0.85 : 1.0);
+
+                for (let y = 0; y < finalWallHeight; y += 4) { 
+                    let p64Y = Math.floor((y / finalWallHeight) * 64); let drawY = topY + y;
+                    if (drawY < 0 || drawY >= canvas.height) continue;
+                    let r = 0, g = 0, b = 0; let skipDraw = false; let pixelNoise = hashNoise(p64X, p64Y) * 15; 
+
+                    if (wallType === 1) { 
+                        let isJoint = (p64X % 16 === 0 || p64Y % 12 === 0);
+                        r = isJoint ? 70 : 125 - pixelNoise; g = isJoint ? 75 : 130 - pixelNoise; b = isJoint ? 80 : 135;
+                    } else if (wallType === 2) { 
+                        if (p64Y > 40) { if (p64X > 22 && p64X < 42) { r = 90 - pixelNoise; g = 60 - pixelNoise; b = 40; } else { skipDraw = true; }
+                        } else { let dither = (Math.floor(p64X/4) + Math.floor(p64Y/4)) % 2 === 0; r = dither ? 25 : 40; g = dither ? 100 - pixelNoise : 130 - pixelNoise; b = dither ? 55 : 70; }
+                    } else if (wallType === 3) { 
+                        if (p64Y < 24) { let tejaBorde = (p64X % 8 === 0 || p64Y % 6 === 0); r = tejaBorde ? 130 : 195 - pixelNoise; g = tejaBorde ? 45 : 85 - pixelNoise; b = tejaBorde ? 30 : 50;
+                        } else { let esViga = (p64X < 4 || p64X > 60 || p64Y === 24 || p64Y === 60 || p64X % 16 === 0 || p64Y === 42); if (esViga) { r = 85 - pixelNoise; g = 55 - pixelNoise; b = 35; } else { r = 222 - pixelNoise; g = 205 - pixelNoise; b = 175; } }
+                    } else if (wallType === 'F') { 
+                        if (p64Y < 20) { r = 90; g = 180 + (Math.floor(Date.now()/200)%2===0?15:0); b = 230 - pixelNoise; } else { r = 110 - pixelNoise; g = 115 - pixelNoise; b = 115; }
+                    } else if (wallType === 4) { let crack = (p64X + p64Y) % 12 === 0; r = crack ? 65 : 120 - pixelNoise; g = crack ? 65 : 125 - pixelNoise; b = crack ? 70 : 125;
+                    } else if (wallType === 'M') { if (p64Y < 12) { r = 250; g = 170; b = 70; } else { if (p64X >= 26 && p64X <= 38) { r = 95 - pixelNoise; g = 70 - pixelNoise; b = 50; } else { skipDraw = true; } } }
+
+                    if (!skipDraw) {
+                        let finalR = Math.max(0, Math.min(255, (r * wallLight) * fogFactor + 11 * (1 - fogFactor)));
+                        let finalG = Math.max(0, Math.min(255, (g * wallLight) * fogFactor + 18 * (1 - fogFactor)));
+                        let finalB = Math.max(0, Math.min(255, (b * wallLight) * fogFactor + 25 * (1 - fogFactor)));
+                        ctx.fillStyle = `rgb(${finalR}, ${finalG}, ${finalB})`; ctx.fillRect(i, drawY, 2, 4);
+                    }
+                }
+            }
+
+            let visibleSprites = [];
+            vecinos.forEach(v => {
+                if (v.estado !== "dentro") {
+                    let sx = v.x - player.x; let sy = v.y - player.y;
+                    let invDet = 1.0 / (Math.cos(player.angle + Math.PI/2) * Math.sin(player.angle) - Math.cos(player.angle) * Math.sin(player.angle + Math.PI/2));
+                    let tx = invDet * (Math.sin(player.angle) * sx - Math.cos(player.angle) * sy);
+                    let ty = invDet * (-Math.sin(player.angle + Math.PI/2) * sx + Math.cos(player.angle + Math.PI/2) * sy);
+                    if (ty > 0.25) visibleSprites.push({ v: v, tx: tx, ty: ty });
+                }
+            });
+
+            visibleSprites.forEach(s => {
+                let spriteScreenX = Math.floor((canvas.width / 2) * (1 + s.tx / s.ty));
+                let spriteHeight = Math.abs(Math.floor(canvas.height / s.ty)) * 0.85;
+                let spriteWidth = spriteHeight * 0.45;
+                let drawStartY = Math.floor((canvas.height - spriteHeight) / 2) + 30; let drawStartX = Math.floor(spriteScreenX - spriteWidth / 2);
+
+                for (let col = 0; col < spriteWidth; col += 2) {
+                    let xLine = drawStartX + col;
+                    if (xLine >= 0 && xLine < canvas.width && s.ty < depthBuffer[xLine]) {
+                        let pX32 = Math.floor((col / spriteWidth) * 32);
+                        for (let rY = 0; rY < spriteHeight; rY += 2) {
+                            let pY32 = Math.floor((rY / spriteHeight) * 32); let yPixel = drawStartY + rY;
+                            if (yPixel >= 0 && yPixel < canvas.height) {
+                                let pixelColor = "rgba(0,0,0,0)";
+                                if (pX32 > 6 && pX32 < 26) { 
+                                    if (pY32 < 10) { pixelColor = (pX32 > 11 && pX32 < 21 && pY32 > 2) ? "#ffdbac" : "#5c4033"; if (pY32 === 6 && (pX32 === 14 || pX32 === 18)) pixelColor = "#000000"; 
+                                    } else if (pY32 >= 10 && pY32 < 25) { pixelColor = (pY32 === 17) ? "#3e2723" : s.v.color;
+                                    } else { pixelColor = "#2b1d11"; } 
+                                }
+                                if (pixelColor !== "rgba(0,0,0,0)") { ctx.fillStyle = pixelColor; ctx.fillRect(xLine, yPixel, 2, 2); }
+                            }
+                        }
+                    }
+                }
+            });
+
+            ctx.fillStyle = "rgba(255, 255, 255, 0.4)"; ctx.font = "bold 11px monospace";
+            ctx.fillText(`VALLEUMBRÍO ENGINE 3D - EDICIÓN CINE GIGANTE HD`, 15, 25);
+        }
+
+        function mainLoop() {
+            timeOfDay = (timeOfDay + timeSpeed) % (Math.PI * 2);
+            processMovement();
+            updateVecinosIA();
+            render3D();
+            requestAnimationFrame(mainLoop);
+        }
+
+        setStage("INTRO");
+        mainLoop();
+    </script>
+</body>
+</html>

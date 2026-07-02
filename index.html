@@ -70,7 +70,7 @@
         #joystick-container {
             width: 120px; height: 120px; background: rgba(30, 41, 59, 0.5);
             border: 2px solid #475569; border-radius: 50%; position: relative;
-            touch-action: none; flex-shrink: 0; display: none; 
+            touch-action: none; flex-shrink: 0; display: none; /* Se activa por JS en móviles */
         }
         #joystick-knob {
             width: 50px; height: 50px; background: #d97706;
@@ -83,20 +83,55 @@
             flex-grow: 1; color:#94a3b8; font-size:0.85em; text-align:right; line-height: 1.4;
         }
 
-        /* AJUSTES EXCLUSIVOS PARA MÓVILES (Pantallas de hasta 768px) */
+        /* AJUSTES RESPONSIVOS EXCLUSIVOS PARA MÓVILES */
         @media (max-width: 768px) {
-            #game-layout {
-                flex-direction: column !important;
-                align-items: center !important;
-            }
-            #canvas-container { 
-                width: 37% !important; /* Limita el contenedor al 37% del ancho en móvil */
-                min-width: 290px;      /* Evita que se colapse por completo en pantallas mini */
-                flex: none;
-            }
             #joystick-container { display: block; }
             .instrucciones-text { text-align: left; font-size: 0.8em; }
-            #side-panel { width: 100%; }
+
+            /* MÓVIL EN VERTICAL (PORTRAIT) */
+            @media (orientation: portrait) {
+                #game-layout {
+                    flex-direction: column !important;
+                    align-items: center !important;
+                }
+                #canvas-container {
+                    width: 33% !important; /* El canvas ocupa el 33% en vertical */
+                    min-width: 260px;      /* Evita colapso extremo de legibilidad */
+                    flex: none;
+                }
+                #side-panel {
+                    width: 100%;
+                }
+                #mobile-controls {
+                    flex-direction: row;
+                    width: 100%;
+                }
+            }
+
+            /* MÓVIL EN HORIZONTAL (LANDSCAPE) */
+            @media (orientation: landscape) {
+                #game-layout {
+                    flex-direction: row !important;
+                    align-items: stretch !important;
+                    width: 100%;
+                }
+                #canvas-container {
+                    width: 33% !important; /* El canvas ocupa el 33% a la izquierda */
+                    flex: none;
+                }
+                #side-panel {
+                    width: 67%; /* El resto del espacio para las notas */
+                }
+                /* Forzamos a que los controles vayan a la derecha */
+                #mobile-controls {
+                    flex-direction: row-reverse !important; 
+                    width: 100%;
+                    margin-top: 15px;
+                }
+                .instrucciones-text {
+                    text-align: right;
+                }
+            }
         }
     </style>
 </head>
@@ -445,6 +480,22 @@
                         if(map[checkY][checkX] === 'M') cercaDePoste = true;
                     }
                 }
+            }
+
+            if (cercano) {
+                vecinoActualId = cercano.id;
+                gameStage = "CONVERSACION"; 
+                interfazActual = null;
+                joystickInput = {x:0, y:0};
+                
+                dialogueText.innerHTML = `<h3>🗣️ Hablando con ${cercano.nombre}</h3>El aldeano se ha detenido. Selecciona una pregunta:`;
+                actionArea.innerHTML = `
+                    <button class="btn-action btn-dialogue" onclick="preguntarVecino('tomas')">¿Tomás?</button>
+                    <button class="btn-action btn-dialogue" onclick="preguntarVecino('pueblo')">¿Qué pasa aquí?</button>
+                    <button class="btn-action btn-dialogue" onclick="preguntarVecino('puzle')">Acertijo</button>
+                    <button class="btn-action btn-close-chat" onclick="cerrarConversacion()">❌ Salir</button>
+                `;
+                return; 
             }
 
             if (cercaDeFuente) {

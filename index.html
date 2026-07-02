@@ -83,54 +83,59 @@
             flex-grow: 1; color:#94a3b8; font-size:0.85em; text-align:right; line-height: 1.4;
         }
 
-        /* AJUSTES RESPONSIVOS EXCLUSIVOS PARA MÓVILES */
+        /* AJUSTES RESPONSIVOS PARA MÓVILES (Hasta 768px de ancho de pantalla) */
         @media (max-width: 768px) {
             #joystick-container { display: block; }
-            .instrucciones-text { text-align: left; font-size: 0.8em; }
-
-            /* MÓVIL EN VERTICAL (PORTRAIT) */
+            
+            /* Ajustes en Orientación Vertical (Portrait) */
             @media (orientation: portrait) {
                 #game-layout {
                     flex-direction: column !important;
                     align-items: center !important;
                 }
-                #canvas-container {
-                    width: 33% !important; /* El canvas ocupa el 33% en vertical */
-                    min-width: 260px;      /* Evita colapso extremo de legibilidad */
+                #canvas-container { 
+                    width: 58% !important; /* Canvas al 58% en vertical */
+                    min-width: 290px;      /* Evita colapso extremo */
                     flex: none;
                 }
-                #side-panel {
-                    width: 100%;
-                }
+                #side-panel { width: 100%; }
                 #mobile-controls {
                     flex-direction: row;
                     width: 100%;
                 }
+                .instrucciones-text { text-align: left; font-size: 0.8em; }
             }
 
-            /* MÓVIL EN HORIZONTAL (LANDSCAPE) */
+            /* Ajustes en Orientación Horizontal (Landscape) */
             @media (orientation: landscape) {
+                body {
+                    flex-direction: row;
+                    flex-wrap: wrap;
+                    justify-content: space-between;
+                    align-items: flex-start;
+                }
+                #game-title { width: 100%; text-align: center; }
                 #game-layout {
-                    flex-direction: row !important;
-                    align-items: stretch !important;
-                    width: 100%;
+                    flex-direction: column;
+                    width: 58% !important; /* Canvas e interfaz izquierda al 58% */
+                    align-items: stretch;
                 }
                 #canvas-container {
-                    width: 33% !important; /* El canvas ocupa el 33% a la izquierda */
-                    flex: none;
+                    width: 100% !important;
                 }
-                #side-panel {
-                    width: 67%; /* El resto del espacio para las notas */
-                }
-                /* Forzamos a que los controles vayan a la derecha */
+                #side-panel { width: 100%; min-height: 150px; }
+                
+                /* Controles móviles pasan al lado derecho */
                 #mobile-controls {
-                    flex-direction: row-reverse !important; 
-                    width: 100%;
-                    margin-top: 15px;
+                    width: 38% !important; /* Ajuste del espacio restante a la derecha */
+                    flex-direction: column-reverse;
+                    justify-content: center;
+                    align-items: center;
+                    gap: 20px;
+                    margin-top: 0;
+                    padding-top: 10px;
                 }
-                .instrucciones-text {
-                    text-align: right;
-                }
+                .instrucciones-text { text-align: center; font-size: 0.75em; }
             }
         }
     </style>
@@ -480,22 +485,6 @@
                         if(map[checkY][checkX] === 'M') cercaDePoste = true;
                     }
                 }
-            }
-
-            if (cercano) {
-                vecinoActualId = cercano.id;
-                gameStage = "CONVERSACION"; 
-                interfazActual = null;
-                joystickInput = {x:0, y:0};
-                
-                dialogueText.innerHTML = `<h3>🗣️ Hablando con ${cercano.nombre}</h3>El aldeano se ha detenido. Selecciona una pregunta:`;
-                actionArea.innerHTML = `
-                    <button class="btn-action btn-dialogue" onclick="preguntarVecino('tomas')">¿Tomás?</button>
-                    <button class="btn-action btn-dialogue" onclick="preguntarVecino('pueblo')">¿Qué pasa aquí?</button>
-                    <button class="btn-action btn-dialogue" onclick="preguntarVecino('puzle')">Acertijo</button>
-                    <button class="btn-action btn-close-chat" onclick="cerrarConversacion()">❌ Salir</button>
-                `;
-                return; 
             }
 
             if (cercaDeFuente) {

@@ -70,7 +70,7 @@
         #joystick-container {
             width: 120px; height: 120px; background: rgba(30, 41, 59, 0.5);
             border: 2px solid #475569; border-radius: 50%; position: relative;
-            touch-action: none; flex-shrink: 0; display: none; /* Se activa por JS en móviles */
+            touch-action: none; flex-shrink: 0; display: none; 
         }
         #joystick-knob {
             width: 50px; height: 50px; background: #d97706;
@@ -82,9 +82,21 @@
         .instrucciones-text {
             flex-grow: 1; color:#94a3b8; font-size:0.85em; text-align:right; line-height: 1.4;
         }
+
+        /* AJUSTES EXCLUSIVOS PARA MÓVILES (Pantallas de hasta 768px) */
         @media (max-width: 768px) {
+            #game-layout {
+                flex-direction: column !important;
+                align-items: center !important;
+            }
+            #canvas-container { 
+                width: 37% !important; /* Limita el contenedor al 37% del ancho en móvil */
+                min-width: 290px;      /* Evita que se colapse por completo en pantallas mini */
+                flex: none;
+            }
             #joystick-container { display: block; }
             .instrucciones-text { text-align: left; font-size: 0.8em; }
+            #side-panel { width: 100%; }
         }
     </style>
 </head>
@@ -350,10 +362,8 @@
             if (keys['d'] || keys['arrowright']) rotation = 1;
 
             if (joystickActive) {
-                // Eje Y del joystick controla avance/retroceso
                 if (joystickInput.y < -0.2) forward = Math.abs(joystickInput.y);
                 if (joystickInput.y > 0.2) forward = -Math.abs(joystickInput.y);
-                // Eje X del joystick controla rotación de cámara
                 if (joystickInput.x < -0.2) rotation = joystickInput.x;
                 if (joystickInput.x > 0.2) rotation = joystickInput.x;
             }
@@ -412,7 +422,6 @@
                 vecinoActualId = cercano.id;
                 gameStage = "CONVERSACION"; 
                 interfazActual = null;
-                // Reset manual del joystick al entrar en diálogos para evitar que el jugador siga caminando solo
                 joystickInput = {x:0, y:0};
                 
                 dialogueText.innerHTML = `<h3>🗣️ Hablando con ${cercano.nombre}</h3>El aldeano se ha detenido. Selecciona una pregunta:`;
